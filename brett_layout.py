@@ -3,11 +3,12 @@
 import numpy as np
 from gdsCAD import * #this may require my patched version of gdsCAD
 from KID import KID
+import matplotlib.pyplot as plt
 
 
 # const globals
 GW = 100 # ground width
-GAP = 8 # gap width
+GAP = 11 # gap width
 SW = 20 # signal width
 FW = 2*GW + 2*GAP + SW # total feedline width
 KKS = 7000. # KID KID seperation
@@ -26,27 +27,35 @@ SIDE_CUT = 75514.2/2.
 NUM_KID = 0 # EVIL MUTABLE GLOBAL. tracks the number of kids. I am lazy
 
 
-def main(n=14, flip=False, KKS=KKS):
+def main(n=2, flip=False, KKS=KKS):
     global NUM_KID
     n += 1
-
+    plt.ion()
     # get main verticies
     x_pts, y_pts_up, y_pts_dn = points_of_interest(n)
 
-    full_layout = (chain(core.Layout('FULL_LAYOUT'))
-        .add(outlines())                                           # add waifer outline (for alignment)
-        .add(vertical_feeds(x_pts, y_pts_up, y_pts_dn))            # vert feedlines
-        .add(horizontal_feeds(x_pts, y_pts_up, y_pts_dn))          # horizontal feedlines
-        .add(corners(x_pts, y_pts_up, y_pts_dn))                   # corners
-        .add(kids_and_grounds(x_pts, y_pts_up, y_pts_dn, KKS=KKS)) # kids and grounds
-        .add(lower_feedline(x_pts, y_pts_up, y_pts_dn))            # add lower feedlines and bonding pads
-        .add(allign(x_pts)))                                       # add alignment marks
+    full_cell = core.Cell('FULL_MASK')
+    full_cell.add(outlines())                                           # add waifer outline (for alignment)
+    full_cell.add(vertical_feeds(x_pts, y_pts_up, y_pts_dn))            # vert feedlines
+    full_cell.add(horizontal_feeds(x_pts, y_pts_up, y_pts_dn))          # horizontal feedlines
+    full_cell.add(corners(x_pts, y_pts_up, y_pts_dn))                   # corners
+#        full_cell.add(kids_and_grounds(x_pts, y_pts_up, y_pts_dn, KKS=KKS)) # kids and grounds
+#        full_cell.add(allign(x_pts))                                       # add alignment marks
+    full_cell.add(lower_feedline(x_pts, y_pts_up, y_pts_dn))            # add lower feedlines and bonding pads)
+    full_cell.flatten()
+
+    full_layout = core.Layout('FULL_LAYOUT')
+    full_layout.add(full_cell)
+
     if flip:                                                   # optionally also add flipped kids
         full_layout.add(kids_and_grounds_r(x_pts, y_pts_up, y_pts_dn, KKS=KKS))
 
     nums = NUM_KID
     print nums," KIDs"
+    #return full_cell
     full_layout.show()
+    plt.savefig("fig.pdf")
+    full_layout.save("mask_{}.gds".format(n-1))
     NUM_KID = 0
     return nums
 
@@ -277,10 +286,10 @@ def cpw_arc(orig, theta1, theta2, radius, rotation=0, reflection=False):
     for outer,inner in zip(map(pr, [GW, GW+GAP+SW, 2*GW+2*GAP+SW]), map(pr, [0.0001, GW+GAP, GW+2*GAP+SW])):
         c = (shapes
             .Disk((0,0),
-            outer,
-            inner_radius=inner,
-            initial_angle=theta1,
-            final_angle=theta2)
+                outer,
+                inner_radius=inner,
+                initial_angle=theta1,
+                final_angle=theta2)
             .translate((0, FW/2))
             .rotate(rotation)
             .translate(orig))

@@ -16,8 +16,8 @@ MIL = 3000. # meander inductor length
 ICL = 1900. # interdigitated capacitor length
 KW = 775 # Kid width
 FKG = 80 # Feedline to KID gap
-BOND_X = 4733 # bonding pad x location
-PAD_H = 2000 # bonding pad hight
+BOND_X = 9000 # bonding pad x location
+PAD_H = 800 # bonding pad hight
 R = 76200/2. # nominal radius
 TOP_CUT = 72212.2/2.
 SIDE_CUT = 75514.2/2.
@@ -27,12 +27,22 @@ SIDE_CUT = 75514.2/2.
 NUM_KID = 0 # EVIL MUTABLE GLOBAL. tracks the number of kids. I am lazy
 
 
-def main(n=2, flip=False, KKS=KKS):
+def main(n=2, flip=False, KKS=KKS, geom=None):
     global NUM_KID
     n += 1
-    plt.ion()
+    #plt.ion()
     # get main verticies
-    x_pts, y_pts_up, y_pts_dn = points_of_interest(n)
+
+    if geom=="simple":
+        x_pts, y_pts_up, y_pts_dn = points_of_interest(3)
+        x_pts = [-BOND_X,BOND_X]
+    elif geom=="shunt":
+        x_pts, y_pts_up, y_pts_dn = points_of_interest(3)
+        x_pts = [-BOND_X,BOND_X]
+        y_pts_up[0] = y_pts_dn[0] + 800
+        y_pts_up[-1] = y_pts_dn[-1] + 800
+    else:
+        x_pts, y_pts_up, y_pts_dn = points_of_interest(n)
 
     full_cell = core.Cell('FULL_MASK')
     full_cell.add(outlines())                                           # add waifer outline (for alignment)
@@ -41,7 +51,7 @@ def main(n=2, flip=False, KKS=KKS):
     full_cell.add(corners(x_pts, y_pts_up, y_pts_dn))                   # corners
 #        full_cell.add(kids_and_grounds(x_pts, y_pts_up, y_pts_dn, KKS=KKS)) # kids and grounds
 #        full_cell.add(allign(x_pts))                                       # add alignment marks
-    full_cell.add(lower_feedline(x_pts, y_pts_up, y_pts_dn))            # add lower feedlines and bonding pads)
+    full_cell.add(lower_feedline(x_pts, y_pts_up, y_pts_dn, geom=geom))            # add lower feedlines and bonding pads)
     full_cell.flatten()
 
     full_layout = core.Layout('FULL_LAYOUT')
@@ -164,8 +174,19 @@ def kids_and_grounds_r(x_pts, y_pts_up, y_pts_dn,KKS):
     return kag
 
 # lower feedline (the part that goes from the last vertical to the edge) and bonding pad
-def lower_feedline(x_pts, y_pts_up, y_pts_dn):
+def lower_feedline(x_pts, y_pts_up, y_pts_dn, geom=None):
     lf = core.Cell("LOWER_FEED")
+
+    if (geom == "simple") or (geom=="shunt"):
+        center_x, bond_y = subfun(3*np.pi/2, R)
+        # bonding pads
+        lf.add(pad((-BOND_X, bond_y)))
+        lf.add(pad((BOND_X, bond_y)))
+
+        # vert
+        lf.add(feedline((y_pts_dn[0] - bond_y - PAD_H) , (-BOND_X,y_pts_dn[0] ), 270.0))
+        lf.add(feedline((y_pts_dn[-1] - bond_y - PAD_H) , (BOND_X,y_pts_dn[-1]), 270.0))
+        return lf
 
 
     t1 = np.arccos(2.842/3.)
@@ -329,7 +350,7 @@ def pad(orig = (0,0)):
     gix = sx + gap
     gox = gix + gw
 
-    s = 30 # scaling factor
+    s = 15 # scaling factor
 
     pd.add(core.Boundary(
         [(s*gox, 0),
@@ -354,7 +375,7 @@ def pad(orig = (0,0)):
 
 def outlines():
     outline = core.Cell("OUTLINE")
-    for i in [1, 2]:
+    for i in [1]:#, 2]:
         outline.add(core.Path(
             map(subfun, np.linspace(0.,2*np.pi,num=180,endpoint=False)),
             width=20,
@@ -389,4 +410,4 @@ class chain:
             return attr
 
 if __name__ == "__main__":
-    main()
+    main(geom="shunt")

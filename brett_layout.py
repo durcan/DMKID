@@ -2,7 +2,7 @@
 
 import numpy as np
 from gdsCAD import * #this may require my patched version of gdsCAD
-from KID import KID
+from KID_1st_fab_ver import KID
 import matplotlib.pyplot as plt
 
 
@@ -11,11 +11,9 @@ GW = 100 # ground width
 GAP = 11 # gap width
 SW = 20 # signal width
 FW = 2*GW + 2*GAP + SW # total feedline width
-KKS = 7000. # KID KID seperation
-MIL = 3000. # meander inductor length
-ICL = 1900. # interdigitated capacitor length
+KKS = 5000. # KID KID seperation
 KW = 775 # Kid width
-FKG = 80 # Feedline to KID gap
+FKG = 0 # Feedline to KID gap
 BOND_X = 9000 # bonding pad x location
 PAD_H = 800 # bonding pad hight
 R = 76200/2. # nominal radius
@@ -49,8 +47,8 @@ def main(n=2, flip=False, KKS=KKS, geom=None):
     full_cell.add(vertical_feeds(x_pts, y_pts_up, y_pts_dn))            # vert feedlines
     full_cell.add(horizontal_feeds(x_pts, y_pts_up, y_pts_dn))          # horizontal feedlines
     full_cell.add(corners(x_pts, y_pts_up, y_pts_dn))                   # corners
-#        full_cell.add(kids_and_grounds(x_pts, y_pts_up, y_pts_dn, KKS=KKS)) # kids and grounds
-#        full_cell.add(allign(x_pts))                                       # add alignment marks
+    full_cell.add(kids_and_grounds(x_pts, y_pts_up, y_pts_dn, KKS=KKS)) # kids and grounds
+    full_cell.add(allign(x_pts))                                       # add alignment marks
     full_cell.add(lower_feedline(x_pts, y_pts_up, y_pts_dn, geom=geom))            # add lower feedlines and bonding pads)
     full_cell.flatten()
 
@@ -63,8 +61,9 @@ def main(n=2, flip=False, KKS=KKS, geom=None):
     nums = NUM_KID
     print nums," KIDs"
     #return full_cell
+    plt.ion()
     full_layout.show()
-    plt.savefig("fig.pdf")
+    plt.savefig("fig.png", dpi=1200)
     full_layout.save("mask_{}.gds".format(n-1))
     NUM_KID = 0
     return nums
@@ -131,18 +130,24 @@ def kids_and_grounds(x_pts, y_pts_up, y_pts_dn,KKS):
         nkids = int(round(l/KKS)) # number of kids for this vertical section
         ys = np.linspace(ydn, yup, nkids, endpoint=False)[1:]
         for y in ys:
-            kid = KID(ICL)
-            delta_y =  (kid.KID_length - MIL) - kid.KID_length/2.0
-            kag.add(ground_shield((x-FW/2, y), kid.KID_length))
-            kag.add(utils.relayer(
-                core.CellReference(
-                    kid.KID,
-                    rotation=90,
-                    origin=(x-FW/2 - FKG, y + delta_y)),
-                [1],
-                2))
             global NUM_KID
             NUM_KID = NUM_KID + 1
+
+    L_list = map(f2l, np.linspace(3.0, 3.5, NUM_KID)) # list of inductor lengths
+    print "L list: {}".format(L_list)
+    Li = 0
+
+    for i,x in enumerate(x_pts):
+        l, yup, ydn = lengths[i], y_pts_up[i], y_pts_dn[i]
+        nkids = int(round(l/KKS)) # number of kids for this vertical section
+        ys = np.linspace(ydn, yup, nkids, endpoint=False)[1:]
+        for y in ys:
+            MIL  = L_list[Li]
+            kid = KID(MIL)
+            delta_y =  kid.w/2.0
+            kag.add(kid.KID_shielded, rotation=90, origin=(x-FW/2 - FKG, y + delta_y))
+            Li += 1
+
 
     return kag
 
@@ -384,6 +389,10 @@ def outlines():
     return outline
 
 # utility functions
+
+def f2l(f):
+    return ((2.507**2) * 1043.0)/(f**2)
+
 def pol2cart(rho, phi):
     x = rho * np.cos(phi)
     y = rho * np.sin(phi)
@@ -410,4 +419,4 @@ class chain:
             return attr
 
 if __name__ == "__main__":
-    main(geom="shunt")
+    main(n = 4)

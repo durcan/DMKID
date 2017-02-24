@@ -20,6 +20,8 @@ R = 76200/2. # nominal radius
 TOP_CUT = 72212.2/2.
 SIDE_CUT = 75514.2/2.
 
+FORCE_SINGLE_LAYER = True # forces all things to a single layer
+
 
 # globals (mut)
 NUM_KID = 0 # EVIL MUTABLE GLOBAL. tracks the number of kids. I am lazy
@@ -51,7 +53,8 @@ def main(n=2, flip=False, KKS=KKS, geom=None):
     full_cell.add(allign(x_pts))                                       # add alignment marks
     full_cell.add(lower_feedline(x_pts, y_pts_up, y_pts_dn, geom=geom))            # add lower feedlines and bonding pads)
     full_cell.flatten()
-
+    if FORCE_SINGLE_LAYER:
+        full_cell = utils.relayer(full_cell, [1, 2], 1)
     full_layout = core.Layout('FULL_LAYOUT')
     full_layout.add(full_cell)
 
@@ -60,10 +63,13 @@ def main(n=2, flip=False, KKS=KKS, geom=None):
 
     nums = NUM_KID
     print nums," KIDs"
-    #return full_cell
+
+
+
     plt.ion()
     full_layout.show()
-    plt.savefig("fig.png", dpi=1200)
+    #plt.savefig("fig.png", dpi=2000)
+    plt.savefig("fig.pdf")
     full_layout.save("mask_{}.gds".format(n-1))
     NUM_KID = 0
     return nums
@@ -380,7 +386,7 @@ def pad(orig = (0,0)):
 
 def outlines():
     outline = core.Cell("OUTLINE")
-    for i in [1]:#, 2]:
+    for i in [1, 2]:
         outline.add(core.Path(
             map(subfun, np.linspace(0.,2*np.pi,num=180,endpoint=False)),
             width=20,
@@ -391,7 +397,7 @@ def outlines():
 # utility functions
 
 def f2l(f):
-    return ((2.507**2) * 1043.0)/(f**2)
+    return 12811.088/(f**2)
 
 def pol2cart(rho, phi):
     x = rho * np.cos(phi)
